@@ -14,7 +14,10 @@ impl StakingContract {
             unstake_balance: 0,
             unstake_start_timestamp: 0,
             unstake_available_epoch: 0,
+            new_account_data: U128(0),
         };
+
+        let account = UpgradableAccount::from(account);
 
         self.accounts.insert(&account_id, &account);
     }

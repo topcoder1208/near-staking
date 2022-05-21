@@ -15,6 +15,7 @@ impl StakingContract {
         let account = self.accounts.get(&account_id);
         if account.is_some() {
             let account = account.unwrap();
+            let account = Account::from(account);
             let new_reward = self.internal_caculate_account_reward(&account);
             AccountJson::from(account_id, account, new_reward)
         } else {
@@ -31,6 +32,7 @@ impl StakingContract {
                     unstake_balance: 0,
                     unstake_start_timestamp: 0,
                     unstake_available_epoch: 0,
+                    new_account_data: U128(0),
                 },
                 0,
             )
@@ -41,6 +43,7 @@ impl StakingContract {
         let account = self.accounts.get(&account_id);
         if account.is_some() {
             let account = account.unwrap();
+            let account = Account::from(account);
             let new_reward = self.internal_caculate_account_reward(&account);
             new_reward + account.pre_reward
         } else {

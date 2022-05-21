@@ -25,6 +25,21 @@ pub enum StorageKey {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, PanicOnDefault)]
+pub struct StakingContractOldV1 {
+    pub owner_id: AccountId,
+    pub ft_contract_id: AccountId,
+    pub config: Config,                     // Cau hinhcong thuc tra thuong
+    pub total_stake_balance: Balance,       // Tong so tien can chon
+    pub total_paid_reward_balance: Balance, // Tong so tien THUONG cho user
+    pub total_staker: Balance,              // Tong so user dang stake
+    pub pre_reward: Balance,
+    pub last_block_balance_change: BlockHeight,
+    pub accounts: LookupMap<AccountId, UpgradableAccount>, // Thong tin chi tiet cua tung user map theo accountId
+    pub paused: bool,
+    pub pause_in_block: BlockHeight,
+}
+
+#[derive(BorshSerialize, BorshDeserialize, PanicOnDefault)]
 #[near_bindgen]
 pub struct StakingContract {
     pub owner_id: AccountId,
@@ -35,9 +50,10 @@ pub struct StakingContract {
     pub total_staker: Balance,              // Tong so user dang stake
     pub pre_reward: Balance,
     pub last_block_balance_change: BlockHeight,
-    pub accounts: LookupMap<AccountId, Account>, // Thong tin chi tiet cua tung user map theo accountId
+    pub accounts: LookupMap<AccountId, UpgradableAccount>, // Thong tin chi tiet cua tung user map theo accountId
     pub paused: bool,
     pub pause_in_block: BlockHeight,
+    pub new_data: U128,
 }
 
 #[near_bindgen]
@@ -62,6 +78,7 @@ impl StakingContract {
             accounts: LookupMap::new(StorageKey::AccountKey),
             paused: false,
             pause_in_block: 0,
+            new_data: U128(0),
         }
     }
 
@@ -89,7 +106,9 @@ impl StakingContract {
     pub fn storage_balance_of(self, account_id: AccountId) -> U128 {
         let account = self.accounts.get(&account_id);
         if account.is_some() {
-            U128(account.unwrap().stake_balance)
+            let account = account.unwrap();
+            let account = Account::from(account);
+            U128(account.stake_balance)
         } else {
             U128(0)
         }
@@ -97,6 +116,27 @@ impl StakingContract {
 
     pub fn is_paused(&self) -> bool {
         self.paused
+    }
+
+    #[private]
+    #[init(ignore_state)]
+    pub fn migrate() -> Self {
+        let staking_v1 : StakingContractOldV1 = env::state_read().expect("Failed to read state");
+
+        StakingContract {
+            owner_id: staking_v1.owner_id,
+            ft_contract_id: staking_v1.ft_contract_id,
+            config: staking_v1.config,
+            total_stake_balance: staking_v1.total_stake_balance,
+            total_paid_reward_balance: staking_v1.total_paid_reward_balance,
+            total_staker: staking_v1.total_staker,
+            pre_reward: staking_v1.pre_reward,
+            last_block_balance_change: env::block_index(),
+            accounts: staking_v1.accounts,
+            paused: staking_v1.paused,
+            pause_in_block: staking_v1.pause_in_block,
+            new_data: U128(10),
+        }
     }
 }
 
