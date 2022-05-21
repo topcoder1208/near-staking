@@ -17,12 +17,14 @@ pub trait FungibleTokenReceiver {
 
 #[ext_contract(ext_ft_contract)]
 pub trait FunngibleToken {
-    fn fn_transfer(&mut self, receiver_id: AccountId, amount: U128, memo: Option<String>);
+    fn ft_transfer(&mut self, receiver_id: AccountId, amount: U128, memo: Option<String>);
 }
 
 #[ext_contract(ext_self)]
 pub trait ExtStakingContract {
     fn ft_transfer_callback(&mut self, amount: U128, account_id: AccountId);
+
+    fn ft_withdraw_callback(&mut self, account_id: AccountId, old_account: Account);
 }
 
 #[near_bindgen]
@@ -45,6 +47,40 @@ impl FungibleTokenReceiver for StakingContract {
 
 #[near_bindgen]
 impl StakingContract {
+    #[private]
+    pub fn unstake(&mut self, amount: U128) {
+        assert_one_yocto();
+
+        let account_id = env::predecessor_account_id();
+
+        self.internal_instake(account_id, amount.0);
+    }
+
+    #[private]
+    pub fn withraw(&mut self, amount: U128) -> Promise {
+        assert_one_yocto();
+
+        let account_id = env::predecessor_account_id();
+
+        let old_account = self.internal_withdraw(account_id.clone(), amount.0);
+
+        ext_ft_contract::ft_transfer(
+            account_id.clone(),
+            U128(old_account.unstake_balance),
+            None,
+            &self.ft_contract_id,
+            DEPOSIT_ONE_YOCTO,
+            FT_TRANSFER_GAS,
+        )
+        .then(ext_self::ft_withdraw_callback(
+            account_id,
+            old_account,
+            &env::current_account_id(),
+            NO_DEPOSIT,
+            FT_HARVEST_CALLBACK_GAS,
+        ))
+    }
+
     pub fn harvest(&mut self) -> Promise {
         assert_one_yocto();
 
@@ -59,7 +95,7 @@ impl StakingContract {
 
         assert!(current_reward > 0, "No reward to harvest");
 
-        ext_ft_contract::fn_transfer(
+        ext_ft_contract::ft_transfer(
             account_id.clone(),
             U128(current_reward),
             None,
@@ -101,6 +137,28 @@ impl StakingContract {
                 self.total_paid_reward_balance += amount.0;
 
                 amount
+            }
+        }
+    }
+
+    #[private]
+    pub fn ft_withdraw_callback(&mut self, account_id: AccountId, old_account: Account) -> U128 {
+        assert_eq!(
+            env::promise_results_count(),
+            1,
+            "ft_withdraw_callback should only be called once"
+        );
+
+        match env::promise_result(0) {
+            PromiseResult::NotReady => unreachable!(),
+
+            PromiseResult::Successful(_) => U128(old_account.unstake_balance),
+
+            PromiseResult::Failed => {
+                // handle rollback data
+                self.accounts
+                    .insert(&account_id, &UpgradableAccount::from(old_account));
+                U128(0)
             }
         }
     }
