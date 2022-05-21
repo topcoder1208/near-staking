@@ -3,8 +3,8 @@ use near_sdk::collections::LookupMap;
 use near_sdk::json_types::U128;
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{
-    env, near_bindgen, AccountId, Balance, BlockHeight, BorshStorageKey, PanicOnDefault, Promise,
-    StorageUsage,
+    env, near_bindgen, ext_contract, AccountId, Balance, BlockHeight, BorshStorageKey, PanicOnDefault, Promise,
+    StorageUsage, PromiseOrValue
 };
 
 mod account;
@@ -12,6 +12,7 @@ mod config;
 mod enumeration;
 mod internal;
 mod util;
+mod core_impl;
 
 use crate::account::*;
 use crate::config::*;
