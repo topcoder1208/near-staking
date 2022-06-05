@@ -1,9 +1,11 @@
 use crate::*;
 
 pub(crate) fn asser_at_least_one_yocto() {
+    let attach_deposit = env::attached_deposit();
     assert!(
         env::attached_deposit() >= 1,
-        "Required deposit is more than 1 yocto NEAR"
+        "Required deposit is more than 1 yocto NEAR. Now {}",
+        attach_deposit
     );
 }
 

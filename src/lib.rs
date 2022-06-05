@@ -1,10 +1,10 @@
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::collections::LookupMap;
+use near_sdk::collections::UnorderedMap;
 use near_sdk::json_types::U128;
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{
     env, near_bindgen, ext_contract, AccountId, Balance, BlockHeight, BorshStorageKey, PanicOnDefault, Promise,
-    StorageUsage, PromiseOrValue
+    PromiseOrValue
 };
 
 mod account;
@@ -16,8 +16,6 @@ mod core_impl;
 
 use crate::account::*;
 use crate::config::*;
-use crate::enumeration::*;
-use crate::internal::*;
 use crate::util::*;
 
 #[derive(BorshDeserialize, BorshSerialize, BorshStorageKey)]
@@ -25,33 +23,17 @@ pub enum StorageKey {
     AccountKey,
 }
 
-#[derive(BorshSerialize, BorshDeserialize, PanicOnDefault)]
-pub struct StakingContractOldV1 {
-    pub owner_id: AccountId,
-    pub ft_contract_id: AccountId,
-    pub config: Config,                     // Cau hinhcong thuc tra thuong
-    pub total_stake_balance: Balance,       // Tong so tien can chon
-    pub total_paid_reward_balance: Balance, // Tong so tien THUONG cho user
-    pub total_staker: Balance,              // Tong so user dang stake
-    pub pre_reward: Balance,
-    pub last_block_balance_change: BlockHeight,
-    pub accounts: LookupMap<AccountId, UpgradableAccount>, // Thong tin chi tiet cua tung user map theo accountId
-    pub paused: bool,
-    pub pause_in_block: BlockHeight,
-}
-
-#[derive(BorshSerialize, BorshDeserialize, PanicOnDefault)]
 #[near_bindgen]
+#[derive(BorshSerialize, BorshDeserialize, PanicOnDefault)]
 pub struct StakingContract {
     pub owner_id: AccountId,
     pub ft_contract_id: AccountId,
-    pub config: Config,                     // Cau hinhcong thuc tra thuong
-    pub total_stake_balance: Balance,       // Tong so tien can chon
-    pub total_paid_reward_balance: Balance, // Tong so tien THUONG cho user
-    pub total_staker: Balance,              // Tong so user dang stake
-    pub pre_reward: Balance,
+    pub config: Config,
+    pub total_stake_balance: Balance,
+    pub total_paid_reward_balance: Balance,
+    pub total_staker: Balance,
     pub last_block_balance_change: BlockHeight,
-    pub accounts: LookupMap<AccountId, UpgradableAccount>, // Thong tin chi tiet cua tung user map theo accountId
+    pub accounts: UnorderedMap<AccountId, UpgradableAccount>,
     pub paused: bool,
     pub pause_in_block: BlockHeight,
     pub new_data: U128,
@@ -74,9 +56,8 @@ impl StakingContract {
             total_stake_balance: 0,
             total_paid_reward_balance: 0,
             total_staker: 0,
-            pre_reward: 0,
             last_block_balance_change: env::block_index(),
-            accounts: LookupMap::new(StorageKey::AccountKey),
+            accounts: UnorderedMap::new(StorageKey::AccountKey),
             paused: false,
             pause_in_block: 0,
             new_data: U128(0),
@@ -117,27 +98,6 @@ impl StakingContract {
 
     pub fn is_paused(&self) -> bool {
         self.paused
-    }
-
-    #[private]
-    #[init(ignore_state)]
-    pub fn migrate() -> Self {
-        let staking_v1 : StakingContractOldV1 = env::state_read().expect("Failed to read state");
-
-        StakingContract {
-            owner_id: staking_v1.owner_id,
-            ft_contract_id: staking_v1.ft_contract_id,
-            config: staking_v1.config,
-            total_stake_balance: staking_v1.total_stake_balance,
-            total_paid_reward_balance: staking_v1.total_paid_reward_balance,
-            total_staker: staking_v1.total_staker,
-            pre_reward: staking_v1.pre_reward,
-            last_block_balance_change: env::block_index(),
-            accounts: staking_v1.accounts,
-            paused: staking_v1.paused,
-            pause_in_block: staking_v1.pause_in_block,
-            new_data: U128(10),
-        }
     }
 }
 

@@ -2,7 +2,7 @@ use crate::*;
 
 #[near_bindgen]
 impl StakingContract {
-    pub(crate) fn internal_instake(&mut self, account_id: AccountId, amount: Balance) {
+    pub(crate) fn internal_unstake(&mut self, account_id: AccountId, amount: Balance) {
         let account = self.accounts.get(&account_id);
         assert!(account.is_some(), "Account not found");
         let account = account.unwrap();
@@ -13,8 +13,8 @@ impl StakingContract {
         let new_reward = self.internal_caculate_account_reward(&account);
 
         // update account data
-        account.pre_reward += new_reward;
-        account.stake_balance -= amount;
+        account.stake_balance -= amount + new_reward;
+        account.paid_reward_balance += new_reward;
         account.last_block_balance_change = env::block_index();
         account.unstake_balance += amount;
 
@@ -28,8 +28,6 @@ impl StakingContract {
         self.accounts
             .insert(&account_id, &UpgradableAccount::from(account));
 
-        let new_contract_reward = self.internal_caculate_total_reward();
-        self.pre_reward += new_contract_reward;
         self.last_block_balance_change = env::block_index();
         self.total_stake_balance -= amount;
     }
@@ -38,7 +36,7 @@ impl StakingContract {
         let account = self.accounts.get(&account_id);   
         assert!(account.is_some(), "Account not found");
         let account = account.unwrap();
-        let mut account = Account::from(account);
+        let account = Account::from(account);
 
         assert!(amount <= account.unstake_balance, "Amount is not enough");
         assert!(account.unstake_available_epoch <= env::epoch_height(), "Unstake is not available");
@@ -46,8 +44,7 @@ impl StakingContract {
         // create new account data because of using old account data for reject if transfer failed
         let new_account = Account {
             stake_balance: account.stake_balance,
-            
-            pre_reward: account.pre_reward,
+
             last_block_balance_change: account.last_block_balance_change,
             unstake_balance: 0,
             unstake_start_timestamp: 0,
@@ -69,7 +66,6 @@ impl StakingContract {
         &mut self,
         account_id: AccountId,
         amount: u128,
-        msg: String,
     ) {
         // validate account
         let account = self.accounts.get(&account_id);
@@ -92,8 +88,8 @@ impl StakingContract {
         let new_reward = self.internal_caculate_account_reward(&account);
 
         // update account data
-        account.pre_reward += new_reward;
-        account.stake_balance += amount;
+        account.stake_balance += amount + new_reward;
+        account.paid_reward_balance += new_reward;
         account.last_block_balance_change = env::block_index();
 
         self.accounts
@@ -101,8 +97,6 @@ impl StakingContract {
 
         // update pool data
         self.total_stake_balance += amount;
-        let new_contract_reward = self.internal_caculate_total_reward();
-        self.pre_reward += new_contract_reward;
         self.last_block_balance_change = env::block_index();
     }
 
@@ -113,7 +107,6 @@ impl StakingContract {
             total_stake_balance: 0,
             total_paid_reward_balance: 0,
             total_staker: 0,
-            pre_reward: 0,
             last_block_balance_change: env::block_index(),
             unstake_balance: 0,
             unstake_start_timestamp: 0,
@@ -153,5 +146,32 @@ impl StakingContract {
                 / self.config.reward_denominator as u128;
 
         reward
+    }
+
+    pub(crate) fn internal_restake(&mut self) {
+        assert_eq!(self.paused, false, "Contract is paused");
+        let accounts = self.accounts.to_vec();
+
+        for (account_id, _account) in accounts.iter() {
+            // validate account
+            let account = self.accounts.get(&account_id);
+
+            let account = account.unwrap();
+            let mut account = Account::from(account);
+
+            let new_reward = self.internal_caculate_account_reward(&account);
+
+            // update account data
+            account.stake_balance += new_reward;
+            account.paid_reward_balance += new_reward;
+            account.last_block_balance_change = env::block_index();
+
+            self.accounts
+                .insert(&account_id, &UpgradableAccount::from(account));
+
+            // update pool data
+            self.total_stake_balance += new_reward;
+            self.last_block_balance_change = env::block_index();
+        }
     }
 }
