@@ -31,7 +31,7 @@ impl FungibleTokenReceiver for StakingContract {
         &mut self,
         sender_id: AccountId,
         amount: U128,
-        _msg: String,
+        msg: String,
     ) -> PromiseOrValue<U128> {
         self.internal_deposit_and_stake(sender_id, amount.0);
 
